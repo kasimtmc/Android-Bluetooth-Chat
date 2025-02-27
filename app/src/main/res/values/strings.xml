@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">Bluetooth Serial Chat</string>
+    <string name="yes">Evet</string>
+    <string name="no">Hayır</string>
+    <string name="give_perm">Uygulamanın çalışabilmesi için izinleri elle ayarlamanız gerekiyor.</string>
+    <string name="ok">Tamam</string>
+    <string name="perm_text">Yakındaki cihazları arama, cihazlara bağlanma ve cihazınızı görünür yapma.\nUygulamaya bu izinleri vermek istiyor musunuz?</string>
+    <string name="perm_title">Şu izinlere ihtiyaç duyuluyor...</string>
+    <string name="cannot_disconnect">Bağlantı kapatılamıyor!</string>
+    <string name="disconnected">Bağlantı kapatıldı</string>
+    <string name="cannot_connect">Bağlanılamıyor!</string>
+    <string name="connected">Bağlanıldı</string>
+    <string name="pairing_cancelled">Eşleştirme iptal edildi!</string>
+    <string name="want_to_pair">Cihazı eşleştirmek istiyor musunuz?</string>
+    <string name="server_started">Sunucu başlatılıyor...</string>
+    <string name="searching">Cihazlar aranıyor...</string>
+    <string name="searching_stp">Arama duraklatıldı</string>
+    <string name="Settings">Ayarlar</string>
+    <string name="requestsAccepted">Sunucuyu aç</string>
+    <string name="devicesAround">Çevredeki Cihazlar</string>
+</resources>

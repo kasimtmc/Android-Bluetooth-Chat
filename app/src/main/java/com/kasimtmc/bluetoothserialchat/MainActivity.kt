@@ -1,0 +1,639 @@
+package com.kasimtmc.bluetoothserialchat
+
+import android.app.AlertDialog
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.SharedPreferences
+import android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+import android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.CountDownTimer
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonColors
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.window.core.layout.WindowHeightSizeClass
+import androidx.window.core.layout.WindowSizeClass
+import androidx.window.core.layout.WindowWidthSizeClass
+import androidx.window.layout.WindowMetricsCalculator
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.kasimtmc.bluetoothserialchat.Constants.REQUEST_CODE_PERMISSIONS
+import com.kasimtmc.bluetoothserialchat.Constants.REQUIRED_PERMISSIONS
+import com.kasimtmc.bluetoothserialchat.GlobalStates.discoverableDuration
+import com.kasimtmc.bluetoothserialchat.GlobalStates.discoveredDevices
+import com.kasimtmc.bluetoothserialchat.GlobalStates.dynamicColors
+import com.kasimtmc.bluetoothserialchat.GlobalStates.hasRemote
+import com.kasimtmc.bluetoothserialchat.GlobalStates.isChat
+import com.kasimtmc.bluetoothserialchat.GlobalStates.isConnected
+import com.kasimtmc.bluetoothserialchat.GlobalStates.isPaired
+import com.kasimtmc.bluetoothserialchat.GlobalStates.messages
+import com.kasimtmc.bluetoothserialchat.GlobalStates.remoteDevice
+import com.kasimtmc.bluetoothserialchat.GlobalStates.selectedDevice
+import com.kasimtmc.bluetoothserialchat.services.ChatService
+import com.kasimtmc.bluetoothserialchat.ui.AppSettings
+import com.kasimtmc.bluetoothserialchat.ui.Chat
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.text.BreakIterator
+import java.text.StringCharacterIterator
+
+class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatService.MessageListener {
+    private lateinit var bluetoothManager: BluetoothManager
+    private lateinit var bluetoothAdapter: BluetoothAdapter
+    private lateinit var chatService: ChatService
+    private lateinit var permAlertDialog: AlertDialog.Builder
+    private lateinit var permAlertDialog2: AlertDialog.Builder
+    private var isFistLaunch: Boolean= true
+    private lateinit var launchPref: SharedPreferences
+    private val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+
+    private val enableBluetoothLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            Toast.makeText(this, "Bluetooth açıldı!", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Bluetooth'u açma reddedildi!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val discoverableLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_CANCELED) {
+            Toast.makeText(this, "Keşfedilebilir olma isteği reddedildi!", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Diğer cihazlar sizi bulabilir!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val receiver= object: BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    val device: BluetoothDevice?=
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                        else intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    if (!discoveredDevices.contains(device)) {
+                        discoveredDevices.add(device)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        //
+        bluetoothManager= getSystemService(BluetoothManager::class.java)
+        bluetoothAdapter= bluetoothManager.adapter
+        //
+        launchPref= this.getSharedPreferences("launchState", MODE_PRIVATE)
+        launchPref.edit().putBoolean("isServer", false).apply()
+        permAlertDialog= AlertDialog.Builder(this)
+        permAlertDialog.setTitle(getString(R.string.perm_title))
+        permAlertDialog.setMessage(getString(R.string.perm_text))
+        permAlertDialog.setPositiveButton(getString(R.string.yes)){_, _ ->
+            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+            launchPref.edit().putBoolean("isFirstLaunch", false).apply()
+        }
+        permAlertDialog.setNegativeButton(getString(R.string.no)) {_, _ ->
+            launchPref.edit().putBoolean("isFirstLaunch", false).apply()
+        }
+
+        permAlertDialog2= AlertDialog.Builder(this)
+        permAlertDialog2.setMessage(getString(R.string.give_perm))
+        permAlertDialog2.setPositiveButton(getString(R.string.ok)){_, _ ->
+            val permIntent= Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            val permUri= Uri.fromParts("package", packageName, null)
+            permIntent.data = permUri
+            startActivity(permIntent)
+        }
+
+        isFistLaunch= launchPref.getBoolean("isFirstLaunch", true)
+        //
+        if (REQUIRED_PERMISSIONS.all {
+                ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+            })
+        {
+            turnOnBt()
+            bluetoothAdapter.cancelDiscovery()
+            registerReceiver(receiver, filter)
+            chatService= ChatService(this, bluetoothAdapter , this, this)
+        } else {
+            if (isFistLaunch) permAlertDialog.show() else permAlertDialog2.show()
+        }
+
+        requestedOrientation = if (compactScreen()) SCREEN_ORIENTATION_PORTRAIT else SCREEN_ORIENTATION_FULL_USER
+        //
+        setContent {
+            AppNavigation()
+        }
+    }
+
+    @Composable
+    private fun MainScreen(modifier: Modifier, navController: NavController, context: Context) {
+        val dynamicColor= dynamicColors(context)
+        val density= ScreenDensity(context)
+        val mainScope= rememberCoroutineScope()
+        val isDiscovering= remember { mutableStateOf(false) }
+        isDiscovering.value= if (REQUIRED_PERMISSIONS.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }) {
+            bluetoothAdapter.isDiscovering
+        } else {
+            bluetoothAdapter.isDiscovering
+        }
+        //lottie anim
+        val lottieComposition by rememberLottieComposition(
+            LottieCompositionSpec.RawRes(
+                R.raw.discovering
+            )
+        )
+        //
+        val drawerState= rememberDrawerState(initialValue = DrawerValue.Closed, confirmStateChange = {true})
+        ModalNavigationDrawer(
+            scrimColor = Color.Transparent,
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    drawerContainerColor = dynamicColor.primaryContainer,
+                    modifier = modifier.width(density.hDp(50.0))
+                ){
+                    Column(
+                        modifier = modifier,
+                        verticalArrangement = Arrangement.Top,
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        //
+                        Spacer(modifier.height(density.vDp(5.0)))
+                        Text(text = stringResource(R.string.devicesAround),
+                            modifier= modifier.align(Alignment.CenterHorizontally),
+                            color = dynamicColor.onPrimaryContainer)
+                        Spacer(modifier.height(density.vDp(0.5)))
+                        HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
+                        Spacer(modifier.height(density.vDp(0.5)))
+                        if (REQUIRED_PERMISSIONS.all {
+                                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                            }) {
+                            if (discoveredDevices.isNotEmpty()) {
+                                discoveredDevices.forEach { device ->
+                                    NavigationDrawerItem(
+                                        label = { Text(
+                                            text = if (device?.name == null) device?.address.toString() else device?.name.toString(),
+                                            color = dynamicColor.onPrimaryContainer) },
+                                        icon = {
+                                            Icon(
+                                                ImageBitmap.imageResource(
+                                                    if (bluetoothAdapter.bondedDevices.contains(device)) R.drawable.bond_bonded
+                                                    else R.drawable.bond_none),
+                                                contentDescription = "search device",
+                                                modifier.size(density.vDp(2.0)),
+                                                tint = if (remoteDevice.value != null) {
+                                                    if (remoteDevice.value == device) Color.Green else dynamicColor.onPrimaryContainer
+                                                } else {
+                                                    dynamicColor.onPrimaryContainer
+                                                }
+                                            )
+                                        },
+                                        selected = false,
+                                        onClick =
+                                        {
+                                            selectedDevice= device
+                                            isPaired.value= bluetoothAdapter.bondedDevices.contains(device)
+                                            if (isPaired.value) {
+                                                navController.navigate("chat")
+                                                mainScope.launch {
+                                                    drawerState.close()
+                                                }
+                                            } else {
+                                                pairDevice(device!!)
+                                            }
+
+                                        }
+                                    )
+                                    HorizontalDivider(
+                                        modifier.widthIn(density.hDp(15.0), density.hDp(30.0)),
+                                        color = dynamicColor.onPrimaryContainer,
+                                        thickness = 1.dp)
+                                }
+                            }
+                        }
+                        //
+                    }
+                    Column(
+                        modifier = modifier
+                            .fillMaxHeight()
+                            .padding(start = density.hDp(2.6)),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        //
+                        Row(modifier, horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = stringResource(R.string.requestsAccepted),
+                                color = dynamicColor.onPrimaryContainer,
+                                modifier = modifier.padding(start = density.vDp(2.0)))
+                            SwitchButton(
+                                modifier = modifier,
+                                size = 0.8f,
+                                colors = SwitchColors(uncheckedIconColor = dynamicColor.onSecondaryContainer,
+                                    uncheckedThumbColor = dynamicColor.onSecondary,
+                                    uncheckedTrackColor = dynamicColor.secondary,
+                                    uncheckedBorderColor = Color.LightGray,
+                                    checkedIconColor = dynamicColor.onPrimaryContainer,
+                                    checkedThumbColor = dynamicColor.onPrimary,
+                                    checkedTrackColor = dynamicColor.primary,
+                                    checkedBorderColor = Color.Gray,
+                                    disabledCheckedIconColor = Color.White,
+                                    disabledCheckedThumbColor = Color.LightGray,
+                                    disabledCheckedTrackColor = Color.DarkGray,
+                                    disabledCheckedBorderColor = Color.Black,
+                                    disabledUncheckedIconColor = Color.White,
+                                    disabledUncheckedThumbColor = dynamicColor.inversePrimary,
+                                    disabledUncheckedTrackColor = Color.DarkGray,
+                                    disabledUncheckedBorderColor = Color.Magenta)
+                            )
+                        }
+                        Spacer(modifier.height(density.vDp(1.0)))
+                        HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
+                        NavigationDrawerItem(
+                            label = { Text(
+                                text = stringResource(R.string.Settings),
+                                color = dynamicColor.onPrimaryContainer) },
+                            icon = {
+                                Icon(
+                                    Icons.Filled.Settings,
+                                    contentDescription = "app settings",
+                                    modifier.size(density.vDp(2.0)),
+                                    tint = dynamicColor.onPrimaryContainer
+                                )
+                            },
+                            selected = false,
+                            onClick =
+                            {
+                                navController.navigate("sets")
+                            }
+                        )
+                        Spacer(modifier.height(density.vDp(3.2)))
+                    }
+                }
+            },
+            gesturesEnabled = true
+        ) {
+            Scaffold(modifier = modifier.fillMaxSize(), containerColor = dynamicColor.background) { innerPadding ->
+                Column(modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)) {
+                    Spacer(modifier.height(density.vDp(10.0)))
+                    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Top) {
+                        if (REQUIRED_PERMISSIONS.all {
+                                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
+                            }) {
+                            Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                val discoveringStateText= remember { mutableStateOf("") }
+                                discoveringStateText.value= if (isDiscovering.value) getString(R.string.searching)
+                                    else getString(R.string.searching_stp)
+                                DiscoveryTextAnimation(discoveringStateText.value, modifier, dynamicColor.onBackground)
+                                Spacer(modifier.height(density.vDp(2.0)))
+                                //
+                                LottieAnimation(
+                                    composition = lottieComposition,
+                                    iterations = LottieConstants.IterateForever,
+                                    isPlaying = isDiscovering.value,
+                                    modifier = modifier.size(density.vDp(30.0))
+                                )
+                                Spacer(modifier.height(density.vDp(2.0)))
+                                FilledIconButton(
+                                    onClick = {
+                                        bluetoothAdapter.startDiscovery()
+                                        object : CountDownTimer(10000, 1) {
+                                            override fun onTick(millisUntilFinished: Long) {
+                                                if (REQUIRED_PERMISSIONS.all {
+                                                        ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
+                                                    }) {
+                                                    isDiscovering.value= bluetoothAdapter.isDiscovering
+                                                }
+                                            }
+                                            override fun onFinish() {
+                                                if (REQUIRED_PERMISSIONS.all {
+                                                        ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
+                                                    }) {
+                                                    bluetoothAdapter.cancelDiscovery()
+                                                }
+                                                isDiscovering.value= false
+                                            }
+                                        }.start()
+                                    },
+                                    modifier = modifier.size(if (!isDiscovering.value) density.vDp(6.0) else density.vDp(3.0)),
+                                    shape = RoundedCornerShape(if (!isDiscovering.value) density.vDp(2.0) else density.vDp(1.0)),
+                                    enabled = !isDiscovering.value,
+                                    colors = IconButtonColors(
+                                        containerColor = dynamicColor.tertiaryContainer,
+                                        contentColor = dynamicColor.onTertiaryContainer,
+                                        disabledContainerColor = Color.Gray,
+                                        disabledContentColor = Color.LightGray)
+                                ){
+                                    Icon(
+                                        ImageBitmap.imageResource(R.drawable.search_ic),
+                                        contentDescription = "search device",
+                                        modifier
+                                            .height(
+                                                if (!isDiscovering.value) density.vDp(4.0) else density.vDp(
+                                                    2.0
+                                                )
+                                            )
+                                            .width(
+                                                if (!isDiscovering.value) density.vDp(4.0) else density.vDp(
+                                                    2.0
+                                                )
+                                            ),
+                                        tint = dynamicColor.onTertiaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        //
+    }
+
+    @Composable
+    private fun ChatScreen(modifier: Modifier, navController: NavController, context: Context, service: ChatService) {
+        Chat(modifier, navController, context, service).Screen()
+    }
+
+    @Composable
+    private fun SettingsScreen(modifier: Modifier, navController: NavController, context: Context) {
+        AppSettings(modifier, navController, context).Screen()
+    }
+
+    //navigation
+    @Composable
+    private fun AppNavigation() {
+        FullScreenEffect(this@MainActivity)
+        val navController= rememberNavController()
+        NavHost(navController = navController,
+            startDestination = "home",
+            enterTransition = {
+                scaleIn(
+                    initialScale = 0f,
+                    transformOrigin = TransformOrigin(pivotFractionX = 1f, pivotFractionY = 0.5f),
+                    animationSpec = tween(500))+
+                        slideInVertically(initialOffsetY = {1000},
+                            animationSpec = tween(500))
+            },
+            exitTransition = {
+                scaleOut(
+                    targetScale = 0f,
+                    transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f),
+                    animationSpec = tween(500))+
+                        slideOutVertically(targetOffsetY = {1000},
+                            animationSpec = tween(500))+
+                        fadeOut(animationSpec = tween(500))
+            },
+            popEnterTransition = {
+                scaleIn(
+                    initialScale = 0f,
+                    transformOrigin = TransformOrigin(pivotFractionX = 1f, pivotFractionY = 0.5f),
+                    animationSpec = tween(500))+
+                        slideInVertically(initialOffsetY = {-1000},
+                            animationSpec = tween(500))
+            },
+            popExitTransition = {
+                scaleOut(
+                    targetScale = 0f,
+                    transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f),
+                    animationSpec = tween(500))+
+                        slideOutVertically(targetOffsetY = {-1000},
+                            animationSpec = tween(500))+
+                        fadeOut(animationSpec = tween(500))
+            },
+            modifier = Modifier.background(
+                color = dynamicColors(this@MainActivity).background
+            )
+        ) {
+            composable("home") { MainScreen(modifier = Modifier, navController, this@MainActivity) }
+            composable("chat") { ChatScreen(modifier = Modifier, navController, this@MainActivity, chatService) }
+            composable("sets") { SettingsScreen(modifier = Modifier, navController, this@MainActivity) }
+        }
+
+    }
+
+    @Composable
+    private fun FullScreenEffect(activity: ComponentActivity) {
+        val view = LocalView.current
+        LaunchedEffect(view) {
+            val window = activity.window
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val controller = WindowInsetsControllerCompat(window, view)
+            controller.hide(WindowInsetsCompat.Type.systemBars()) // tuşlar ve statusbar'ı gizle
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE // alttan ya da üstten çekince göster
+        }
+    }
+
+    @Composable
+    private fun SwitchButton(
+        modifier: Modifier,
+        size: Float= 1f,
+        enabled: Boolean= true,
+        colors: SwitchColors = SwitchDefaults.colors() )
+    {
+        val switchScope= rememberCoroutineScope()
+        Switch(
+            modifier = modifier.scale(size),
+            checked = isChat.value,
+            enabled = enabled,
+            onCheckedChange = {
+                isChat.value = it
+                switchScope.launch {
+                    if (bluetoothAdapter.isEnabled) {
+                        if (isChat.value) {
+                            chatService.startServer()
+                        } else {
+                            chatService.stopServer()
+                            //discoveredDevices.clear()
+                            remoteDevice.value= null
+                        }
+                    }
+                }
+                if (isChat.value) {
+                    setDiscoverable()
+                }
+            },
+            colors = colors
+        )
+    }
+
+    @Composable
+    private fun DiscoveryTextAnimation(text: String, modifier: Modifier, color: Color) {
+        val breakIterator = remember(text) { BreakIterator.getCharacterInstance() }
+        var substringText by remember { mutableStateOf("") }
+        //
+        LaunchedEffect(text) {
+            //
+            delay(200L)
+            breakIterator.text = StringCharacterIterator(text)
+
+            var nextIndex = breakIterator.next()
+            while (nextIndex != BreakIterator.DONE) {
+                substringText = text.subSequence(0, nextIndex).toString()
+                nextIndex = breakIterator.next()
+                delay(20L)
+            }
+        }
+        Text(text = substringText, modifier = modifier, color = color)
+    }
+
+    private fun setDiscoverable() {
+        if (REQUIRED_PERMISSIONS.all {
+                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
+            }) {
+            if (bluetoothAdapter.isEnabled) {
+                val discoverableIntent= Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, discoverableDuration.intValue)
+                }
+                discoverableLauncher.launch(discoverableIntent)
+            }
+        }
+    }
+
+    private fun compactScreen() : Boolean {
+        val metrics = WindowMetricsCalculator.getOrCreate().computeMaximumWindowMetrics(this)
+        val width = metrics.bounds.width()
+        val height = metrics.bounds.height()
+        val density = resources.displayMetrics.density
+        val windowSizeClass = WindowSizeClass.compute(width/density, height/density)
+
+        return windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT ||
+                windowSizeClass.windowHeightSizeClass == WindowHeightSizeClass.COMPACT
+    }
+
+    private fun turnOnBt() {
+        if (!bluetoothAdapter.isEnabled) {
+            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+            enableBluetoothLauncher.launch(enableBtIntent)
+        }
+    }
+
+    private fun pairDevice(btDevice: BluetoothDevice) {
+        val method= btDevice::class.java.getMethod("createBond")
+        val pairDialog= AlertDialog.Builder(this)
+        pairDialog.setMessage(getString(R.string.want_to_pair))
+        pairDialog.setPositiveButton(getString(R.string.yes)) { _, _ ->
+            method.invoke(btDevice)
+        }
+        pairDialog.setNegativeButton(getString(R.string.no)) { _, _ ->
+            Toast.makeText(this, getString(R.string.pairing_cancelled), Toast.LENGTH_SHORT).show()
+        }
+        pairDialog.show()
+    }
+
+    override fun onConnectionStateChanged(state: Boolean) {
+        isConnected.value= state
+    }
+
+    override fun onSecureConnection(device: BluetoothDevice?) {
+        if (device != null && !discoveredDevices.contains(device)) {
+            remoteDevice.value= device
+            hasRemote.value= true
+            discoveredDevices.add(device)
+        } else {
+            remoteDevice.value= null
+            //discoveredDevices.clear()
+            hasRemote.value= false
+        }
+        if (device != null && discoveredDevices.contains(device)){
+            val deviceIndex= discoveredDevices.indexOf(device)
+            discoveredDevices.removeAt(deviceIndex)
+            discoveredDevices.add(device)
+        }
+    }
+
+    override fun onMessageReceived(message: String) {
+        messages.add(Message(message, true))
+    }
+
+    override fun onMessageSent(outgoing: String) {
+        messages.add(Message(outgoing, false))
+    }
+
+}
