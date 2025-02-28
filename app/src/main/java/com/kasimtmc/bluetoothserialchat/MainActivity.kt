@@ -22,6 +22,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -39,7 +43,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,7 +64,6 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,9 +74,11 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -235,7 +239,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = dynamicColor.primaryContainer,
-                    modifier = modifier.width(density.hDp(50.0))
+                    modifier = modifier.fillMaxWidth(0.5f)
                 ){
                     Column(
                         modifier = modifier,
@@ -348,7 +352,10 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                             selected = false,
                             onClick =
                             {
-                                navController.navigate("sets")
+                                mainScope.launch {
+                                    drawerState.close()
+                                    navController.navigate("sets")
+                                }
                             }
                         )
                         Spacer(modifier.height(density.vDp(3.2)))
@@ -358,18 +365,15 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
             gesturesEnabled = true
         ) {
             Scaffold(modifier = modifier.fillMaxSize(), containerColor = dynamicColor.background) { innerPadding ->
-                Column(modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)) {
-                    Spacer(modifier.height(density.vDp(10.0)))
+                Column(modifier.fillMaxSize().padding(innerPadding), verticalArrangement = Arrangement.Top) {
+                    Spacer(modifier.height(density.vDp(8.0)))
                     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Top) {
                         if (REQUIRED_PERMISSIONS.all {
                                 ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
                             }) {
-                            Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Top) {
                                 val discoveringStateText= remember { mutableStateOf("") }
-                                discoveringStateText.value= if (isDiscovering.value) getString(R.string.searching)
-                                    else getString(R.string.searching_stp)
+                                discoveringStateText.value= if (isDiscovering.value) getString(R.string.searching) else getString(R.string.searching_stp)
                                 DiscoveryTextAnimation(discoveringStateText.value, modifier, dynamicColor.onBackground)
                                 Spacer(modifier.height(density.vDp(2.0)))
                                 //
@@ -377,9 +381,18 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                                     composition = lottieComposition,
                                     iterations = LottieConstants.IterateForever,
                                     isPlaying = isDiscovering.value,
-                                    modifier = modifier.size(density.vDp(30.0))
+                                    modifier = modifier.fillMaxSize(0.35f),
+                                    alignment = Alignment.Center,
+                                    contentScale = ContentScale.Crop
                                 )
                                 Spacer(modifier.height(density.vDp(2.0)))
+                                val filledSize: Dp by animateDpAsState(
+                                    targetValue = if (!isDiscovering.value) density.aDp(8.0) else density.aDp(4.0),
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    )
+                                )
                                 FilledIconButton(
                                     onClick = {
                                         bluetoothAdapter.startDiscovery()
@@ -401,8 +414,8 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                                             }
                                         }.start()
                                     },
-                                    modifier = modifier.size(if (!isDiscovering.value) density.vDp(6.0) else density.vDp(3.0)),
-                                    shape = RoundedCornerShape(if (!isDiscovering.value) density.vDp(2.0) else density.vDp(1.0)),
+                                    modifier = modifier.size(filledSize),
+                                    shape = RoundedCornerShape(if (!isDiscovering.value) density.aDp(3.0) else density.aDp(1.5)),
                                     enabled = !isDiscovering.value,
                                     colors = IconButtonColors(
                                         containerColor = dynamicColor.tertiaryContainer,
@@ -413,17 +426,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                                     Icon(
                                         ImageBitmap.imageResource(R.drawable.search_ic),
                                         contentDescription = "search device",
-                                        modifier
-                                            .height(
-                                                if (!isDiscovering.value) density.vDp(4.0) else density.vDp(
-                                                    2.0
-                                                )
-                                            )
-                                            .width(
-                                                if (!isDiscovering.value) density.vDp(4.0) else density.vDp(
-                                                    2.0
-                                                )
-                                            ),
+                                        modifier.size(if (!isDiscovering.value) density.aDp(5.0) else density.aDp(2.5)),
                                         tint = dynamicColor.onTertiaryContainer
                                     )
                                 }
@@ -443,7 +446,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
 
     @Composable
     private fun SettingsScreen(modifier: Modifier, navController: NavController, context: Context) {
-        AppSettings(modifier, navController, context).Screen()
+        AppSettings(modifier, navController, context, launchPref).Screen()
     }
 
     //navigation
@@ -457,35 +460,65 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                 scaleIn(
                     initialScale = 0f,
                     transformOrigin = TransformOrigin(pivotFractionX = 1f, pivotFractionY = 0.5f),
-                    animationSpec = tween(500))+
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessHigh
+                    ))+
                         slideInVertically(initialOffsetY = {1000},
-                            animationSpec = tween(500))
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessHigh
+                            ))
             },
             exitTransition = {
                 scaleOut(
                     targetScale = 0f,
                     transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f),
-                    animationSpec = tween(500))+
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessHigh
+                    ))+
                         slideOutVertically(targetOffsetY = {1000},
-                            animationSpec = tween(500))+
-                        fadeOut(animationSpec = tween(500))
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessHigh
+                            ))+
+                        fadeOut(animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessHigh
+                        ))
             },
             popEnterTransition = {
                 scaleIn(
                     initialScale = 0f,
                     transformOrigin = TransformOrigin(pivotFractionX = 1f, pivotFractionY = 0.5f),
-                    animationSpec = tween(500))+
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessHigh
+                    ))+
                         slideInVertically(initialOffsetY = {-1000},
-                            animationSpec = tween(500))
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessHigh
+                            ))
             },
             popExitTransition = {
                 scaleOut(
                     targetScale = 0f,
                     transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f),
-                    animationSpec = tween(500))+
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessHigh
+                    ))+
                         slideOutVertically(targetOffsetY = {-1000},
-                            animationSpec = tween(500))+
-                        fadeOut(animationSpec = tween(500))
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessHigh
+                            ))+
+                        fadeOut(animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessHigh
+                        ))
             },
             modifier = Modifier.background(
                 color = dynamicColors(this@MainActivity).background
@@ -518,6 +551,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
         colors: SwitchColors = SwitchDefaults.colors() )
     {
         val switchScope= rememberCoroutineScope()
+        val sepServer by remember { mutableStateOf(launchPref.getBoolean("sepServer", false)) }
         Switch(
             modifier = modifier.scale(size),
             checked = isChat.value,
@@ -535,7 +569,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                         }
                     }
                 }
-                if (isChat.value) {
+                if (isChat.value && !sepServer) {
                     setDiscoverable()
                 }
             },
