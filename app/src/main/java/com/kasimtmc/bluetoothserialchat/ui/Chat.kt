@@ -3,9 +3,7 @@ package com.kasimtmc.bluetoothserialchat.ui
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,9 +27,11 @@ import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -165,38 +166,34 @@ class Chat(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Bottom) {
                     //
-                    TextField(
+                    OutlinedTextField(
                         modifier = modifier
                             .fillMaxWidth(0.80f)
-                            .border(
-                                border = BorderStroke(
-                                    4.dp,
-                                    color = if (isConnected.value) dynamicColor.inversePrimary else Color.DarkGray
-                                ), shape = AbsoluteRoundedCornerShape(12.dp)
-                            ),
+                            .align(Alignment.CenterVertically),
                         enabled = isConnected.value,
                         value = chatOutgoing,
                         onValueChange = { chatOutgoing = it },
-                        label = { Text("message") },
-                        colors = TextFieldColors(
+                        label = { Text(text = "message") },
+                        shape = AbsoluteRoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
                             cursorColor = dynamicColor.onSecondaryContainer,
                             focusedTextColor = dynamicColor.onSecondaryContainer,
                             unfocusedTextColor = dynamicColor.onSecondary,
                             disabledTextColor = dynamicColor.inversePrimary,
                             errorTextColor = Color.Red,
-                            focusedContainerColor = dynamicColor.secondaryContainer,
-                            unfocusedContainerColor = dynamicColor.secondary,
+                            focusedContainerColor = dynamicColor.surfaceContainerHigh,
+                            unfocusedContainerColor = dynamicColor.surfaceContainerLow,
                             disabledContainerColor = Color.Gray,
                             errorContainerColor = dynamicColor.inversePrimary,
-                            errorCursorColor = Color.Cyan,
-                            textSelectionColors = TextSelectionColors(
+                            focusedBorderColor = dynamicColor.inversePrimary,
+                            unfocusedBorderColor = Color.Gray,
+                            disabledBorderColor = Color.DarkGray,
+                            errorBorderColor = Color.Red,
+                            selectionColors = TextSelectionColors(
                                 dynamicColor.tertiary,
                                 dynamicColor.inversePrimary
                             ),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                            errorIndicatorColor = Color.Red,
+                            errorCursorColor = Color.Cyan,
                             focusedLeadingIconColor = Color.Transparent,
                             unfocusedLeadingIconColor = Color.Transparent,
                             disabledLeadingIconColor = Color.Transparent,
@@ -205,8 +202,8 @@ class Chat(
                             unfocusedTrailingIconColor = Color.Transparent,
                             disabledTrailingIconColor = Color.Transparent,
                             errorTrailingIconColor = Color.Transparent,
-                            focusedLabelColor = Color.Transparent,
-                            unfocusedLabelColor = dynamicColor.onSecondary,
+                            focusedLabelColor = dynamicColor.outline,
+                            unfocusedLabelColor = dynamicColor.outline,
                             disabledLabelColor = Color.Gray,
                             errorLabelColor = Color.Red,
                             focusedPlaceholderColor = Color.Transparent,
@@ -225,14 +222,12 @@ class Chat(
                             unfocusedSuffixColor = Color.Transparent,
                             disabledSuffixColor = Color.Transparent,
                             errorSuffixColor = Color.Transparent,
-                        ),
-                        shape = AbsoluteRoundedCornerShape(16.dp),
-                        maxLines = 2
+                        )
                     )
                     //
                     Spacer(modifier.width(density.hDp(3.0)))
                     FloatingActionButton(
-                        modifier = modifier.align(Alignment.CenterVertically),
+                        modifier = modifier,
                         onClick = {
                             if (chatOutgoing.isNotEmpty()) {
                                 outgoing= chatOutgoing
