@@ -17,18 +17,21 @@ import com.kasimtmc.bluetoothserialchat.ui.Chat
 object GlobalStates {
     private val remote: BluetoothDevice? = null
     //message list, related with Message()
-    val messages = mutableStateListOf<Message>()
+    val messages= mutableStateListOf<Message>()
     // connection state
     val discoverableDuration= mutableIntStateOf( 300)
     val discoveredDevices= mutableStateListOf<BluetoothDevice?>()
-    val isConnected = mutableStateOf(false)
-    val isPaired = mutableStateOf(false)
+    val isConnected= mutableStateOf(false)
+    val isPaired= mutableStateOf(false)
     val deviceDetails= mutableStateOf("Eşleştirilmiş")
     var selectedDevice: BluetoothDevice?= null
     val isChat= mutableStateOf(false)
     val hasRemote= mutableStateOf(false)
     val remoteDevice= mutableStateOf(remote)
     val serverName= mutableStateOf("Chat Server")
+    val settingSwitches= mutableStateListOf("Sunucu açıldığında bulunabilirlik açılmasın", "Arama süresi", "Bulunabilirlik süresi")
+    val settingSwitchesPref= mutableStateListOf("sepServer", "searchTime", "disTime")
+    val isButton= mutableStateListOf( true, false, false)
 
     @Composable
     fun dynamicColors(context: Context): ColorScheme {
