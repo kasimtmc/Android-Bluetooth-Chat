@@ -21,4 +21,8 @@ class ScreenDensity(context: Context) {
         return ((hDp/100) * percent).dp
     }
 
+    fun aDp(percent: Double) : Dp {
+        return ( ((hDp/100) * percent).dp + ((vDp/100) * percent).dp )/2
+    }
+
 }
