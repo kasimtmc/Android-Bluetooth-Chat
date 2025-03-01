@@ -27,12 +27,10 @@ import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,7 +44,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.imageResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,12 +73,16 @@ class Chat(
 
     private var outgoing= ""
 
+    private fun allPermissionsGranted()= REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+    }
+
     @Composable
     fun Screen() {
         val dynamicColor= dynamicColors(context)
         val density= ScreenDensity(context)
         val chatScope= rememberCoroutineScope()
-        val deviceName by remember { mutableStateOf(if (selectedDevice?.name == null) selectedDevice?.address.toString() else selectedDevice?.name.toString()) }
+        val deviceName by remember { mutableStateOf(if (allPermissionsGranted() && selectedDevice?.name == null) selectedDevice?.address.toString() else selectedDevice?.name.toString()) }
         var detailText by remember { mutableStateOf("Eşleştirilmiş") }
         val listState= rememberLazyListState()
         var chatOutgoing: String by remember { mutableStateOf("") }
@@ -108,9 +109,7 @@ class Chat(
             {
                 Spacer(modifier.height(if (isImeVisible) density.vDp(5.0) else density.vDp(8.0)))
                 Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Top) {
-                    if (REQUIRED_PERMISSIONS.all {
-                            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                        }) {
+                    if (allPermissionsGranted()) {
                         DeviceText(deviceName, dynamicColor)
                         Spacer(modifier.height(density.vDp(2.0)))
                         detailText= deviceDetails.value

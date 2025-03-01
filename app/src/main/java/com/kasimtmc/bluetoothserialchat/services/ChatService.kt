@@ -43,10 +43,12 @@ class ChatService(
     private lateinit var outputStream: OutputStream
     private lateinit var connectedThread: ConnectedThread
 
+    private fun allPermissionsGranted()= REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+    }
+
     suspend fun startServer() {
-        if (REQUIRED_PERMISSIONS.all {
-                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-            }) {
+        if (allPermissionsGranted()) {
             try {
                 withContext(Dispatchers.IO) {
                     serverSocket = adapter.listenUsingRfcommWithServiceRecord(serverName.value, uuid)
@@ -80,10 +82,7 @@ class ChatService(
     }
 
     suspend fun connect() {
-        if (REQUIRED_PERMISSIONS.all {
-                ContextCompat.checkSelfPermission(context, it) ==
-                        PackageManager.PERMISSION_GRANTED
-            })
+        if (allPermissionsGranted())
         {
             withTimeout(2000) {
                 try {
