@@ -23,6 +23,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -129,6 +130,26 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
     private lateinit var isFirstLaunchPref: SharedPreferences
     private val filter= IntentFilter(BluetoothDevice.ACTION_FOUND)
 
+    private val enableBluetoothLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            Toast.makeText(this, "Bluetooth açıldı!", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Bluetooth'u açma reddedildi!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val discoverableLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_CANCELED) {
+            Toast.makeText(this, "Keşfedilebilir olma isteği reddedildi!", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Diğer cihazlar sizi bulabilir!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private val receiver= object: BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -158,25 +179,41 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
         bluetoothAdapter= bluetoothManager.adapter
         //
         isFirstLaunchPref= this.getSharedPreferences("launchState", MODE_PRIVATE)
+
+        permAlertDialog= AlertDialog.Builder(this)
+        permAlertDialog.setTitle(getString(R.string.perm_title))
+        permAlertDialog.setMessage(getString(R.string.perm_text))
+        permAlertDialog.setPositiveButton(getString(R.string.yes)){_, _ ->
+            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+            isFirstLaunchPref.edit().putBoolean("isFirstLaunch", false).apply()
+        }
+        permAlertDialog.setNegativeButton(getString(R.string.no)) {_, _ ->
+            isFirstLaunchPref.edit().putBoolean("isFirstLaunch", false).apply()
+        }
+        permAlertDialog2= AlertDialog.Builder(this)
+        permAlertDialog2.setMessage(getString(R.string.give_perm))
+        permAlertDialog2.setPositiveButton(getString(R.string.ok)){_, _ ->
+            val permIntent= Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            val permUri= Uri.fromParts("package", packageName, null)
+            permIntent.data = permUri
+            startActivity(permIntent)
+        }
+
         isFistLaunch= isFirstLaunchPref.getBoolean("isFirstLaunch", true)
+
 
         //
         registerReceiver(receiver, filter)
         chatService= ChatService(this, bluetoothAdapter , this, this)
         setContent {
-            val permissionsState= rememberMultiplePermissionsState(permissions)
-            when (requestPermissions()) {
+            when (checkPermissions()) {
                 true -> {
-                    Screen()
+                    AppNavigation()
                     turnOnBt()
                     bluetoothAdapter.cancelDiscovery()
                 }
                 else -> {
-                    LaunchedEffect(Unit) {
-                        if (!permissionsState.allPermissionsGranted) {
-                            permissionsState.launchMultiplePermissionRequest()
-                        }
-                    }
+                    if (isFistLaunch) permAlertDialog.show() else permAlertDialog2.show()
                 }
             }
         }
@@ -185,7 +222,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
 
     @OptIn(ExperimentalPermissionsApi::class)
     @Composable
-    private fun requestPermissions(): Boolean {
+    private fun checkPermissions(): Boolean {
         val permissionsState= rememberMultiplePermissionsState(permissions)
         return permissionsState.allPermissionsGranted
     }
@@ -270,11 +307,6 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
             composable("sets") { SettingsScreen(modifier = Modifier, navController, this@MainActivity) }
         }
     }
-
-    @Composable
-    fun Screen() {
-        AppNavigation()
-    }
     
     @SuppressLint("MissingPermission")
     @Composable
@@ -282,8 +314,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
         val dynamicColor= dynamicColors(context)
         val density= ScreenDensity(context)
         val mainScope= rememberCoroutineScope()
-        val isDiscovering= remember { mutableStateOf(false) }
-        isDiscovering.value= bluetoothAdapter.isDiscovering
+        var isDiscovering by remember { mutableStateOf(bluetoothAdapter.isDiscovering) }
         //lottie anim
         val lottieComposition by rememberLottieComposition(
             LottieCompositionSpec.RawRes(
@@ -425,21 +456,21 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Top) {
                         Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Top) {
                             val discoveringStateText= remember { mutableStateOf("") }
-                            discoveringStateText.value= if (isDiscovering.value) getString(R.string.searching) else getString(R.string.searching_stp)
+                            discoveringStateText.value= if (isDiscovering) getString(R.string.searching) else getString(R.string.searching_stp)
                             DiscoveryTextAnimation(discoveringStateText.value, modifier, dynamicColor.onBackground)
                             Spacer(modifier.height(density.vDp(2.0)))
                             //
                             LottieAnimation(
                                 composition = lottieComposition,
                                 iterations = LottieConstants.IterateForever,
-                                isPlaying = isDiscovering.value,
+                                isPlaying = isDiscovering,
                                 modifier = modifier.fillMaxSize(0.35f),
                                 alignment = Alignment.Center,
                                 contentScale = ContentScale.Crop
                             )
                             Spacer(modifier.height(density.vDp(2.0)))
                             val filledSize: Dp by animateDpAsState(
-                                targetValue = if (!isDiscovering.value) density.aDp(8.0) else density.aDp(4.0),
+                                targetValue = if (!isDiscovering) density.aDp(8.0) else density.aDp(4.0),
                                 animationSpec = spring(
                                     dampingRatio = Spring.DampingRatioMediumBouncy,
                                     stiffness = Spring.StiffnessMedium
@@ -447,20 +478,22 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                             )
                             FilledIconButton (
                                 onClick = {
-                                    bluetoothAdapter.startDiscovery()
-                                    object : CountDownTimer(10000, 1) {
-                                        override fun onTick(millisUntilFinished: Long) {
-                                            isDiscovering.value= bluetoothAdapter.isDiscovering
-                                        }
-                                        override fun onFinish() {
-                                            bluetoothAdapter.cancelDiscovery()
-                                            isDiscovering.value= false
-                                        }
-                                    }.start()
+                                    if (allPermissionsGranted()) {
+                                        bluetoothAdapter.startDiscovery()
+                                        object : CountDownTimer(10000, 1) {
+                                            override fun onTick(millisUntilFinished: Long) {
+                                                isDiscovering= bluetoothAdapter.isDiscovering
+                                            }
+                                            override fun onFinish() {
+                                                bluetoothAdapter.cancelDiscovery()
+                                                isDiscovering= false
+                                            }
+                                        }.start()
+                                    }
                                 },
                                 modifier = modifier.size(filledSize),
-                                shape = RoundedCornerShape(if (!isDiscovering.value) density.aDp(3.0) else density.aDp(1.5)),
-                                enabled = !isDiscovering.value,
+                                shape = RoundedCornerShape(if (!isDiscovering) density.aDp(3.0) else density.aDp(1.5)),
+                                enabled = !isDiscovering,
                                 colors = IconButtonColors(
                                     containerColor = dynamicColor.tertiaryContainer,
                                     contentColor = dynamicColor.onTertiaryContainer,
@@ -470,7 +503,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                                 Icon(
                                     ImageBitmap.imageResource(R.drawable.search_ic),
                                     contentDescription = "search device",
-                                    modifier.size(if (!isDiscovering.value) density.aDp(5.0) else density.aDp(2.5)),
+                                    modifier.size(if (!isDiscovering) density.aDp(5.0) else density.aDp(2.5)),
                                     tint = dynamicColor.onTertiaryContainer
                                 )
                             }
@@ -562,7 +595,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
             val discoverableIntent= Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
                 putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, discoverableDuration.intValue)
             }
-            startActivityForResult(discoverableIntent, 1)
+            discoverableLauncher.launch(discoverableIntent)
         }
     }
 
@@ -581,7 +614,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
     private fun turnOnBt() {
         if (!bluetoothAdapter.isEnabled) {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-            startActivityForResult(enableBtIntent, 1)
+            enableBluetoothLauncher.launch(enableBtIntent)
         }
     }
 
