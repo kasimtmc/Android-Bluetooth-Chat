@@ -1,5 +1,7 @@
 package com.kasimtmc.bluetoothserialchat
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -21,12 +23,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -97,8 +96,11 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.kasimtmc.bluetoothserialchat.Constants.REQUEST_CODE_PERMISSIONS
 import com.kasimtmc.bluetoothserialchat.Constants.REQUIRED_PERMISSIONS
+import com.kasimtmc.bluetoothserialchat.Constants.permissions
 import com.kasimtmc.bluetoothserialchat.GlobalStates.discoverableDuration
 import com.kasimtmc.bluetoothserialchat.GlobalStates.discoveredDevices
 import com.kasimtmc.bluetoothserialchat.GlobalStates.dynamicColors
@@ -124,36 +126,19 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
     private lateinit var permAlertDialog: AlertDialog.Builder
     private lateinit var permAlertDialog2: AlertDialog.Builder
     private var isFistLaunch: Boolean= true
-    private lateinit var launchPref: SharedPreferences
-    private val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
-
-    private val enableBluetoothLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            Toast.makeText(this, "Bluetooth açıldı!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Bluetooth'u açma reddedildi!", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private val discoverableLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_CANCELED) {
-            Toast.makeText(this, "Keşfedilebilir olma isteği reddedildi!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Diğer cihazlar sizi bulabilir!", Toast.LENGTH_SHORT).show()
-        }
-    }
+    private lateinit var isFirstLaunchPref: SharedPreferences
+    private val filter= IntentFilter(BluetoothDevice.ACTION_FOUND)
 
     private val receiver= object: BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 BluetoothDevice.ACTION_FOUND -> {
                     val device: BluetoothDevice?=
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                        else intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                        } else {
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        }
                     if (!discoveredDevices.contains(device)) {
                         discoveredDevices.add(device)
                     }
@@ -162,275 +147,34 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
         }
     }
 
+    @OptIn(ExperimentalPermissionsApi::class)
+    @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestedOrientation = if (compactScreen()) SCREEN_ORIENTATION_PORTRAIT else SCREEN_ORIENTATION_FULL_USER
         //
         bluetoothManager= getSystemService(BluetoothManager::class.java)
         bluetoothAdapter= bluetoothManager.adapter
         //
-        launchPref= this.getSharedPreferences("launchState", MODE_PRIVATE)
-        launchPref.edit().putBoolean("isServer", false).apply()
-        permAlertDialog= AlertDialog.Builder(this)
-        permAlertDialog.setTitle(getString(R.string.perm_title))
-        permAlertDialog.setMessage(getString(R.string.perm_text))
-        permAlertDialog.setPositiveButton(getString(R.string.yes)){_, _ ->
-            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
-            launchPref.edit().putBoolean("isFirstLaunch", false).apply()
-        }
-        permAlertDialog.setNegativeButton(getString(R.string.no)) {_, _ ->
-            launchPref.edit().putBoolean("isFirstLaunch", false).apply()
-        }
+        isFirstLaunchPref= this.getSharedPreferences("launchState", MODE_PRIVATE)
+        isFistLaunch= isFirstLaunchPref.getBoolean("isFirstLaunch", true)
 
-        permAlertDialog2= AlertDialog.Builder(this)
-        permAlertDialog2.setMessage(getString(R.string.give_perm))
-        permAlertDialog2.setPositiveButton(getString(R.string.ok)){_, _ ->
-            val permIntent= Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            val permUri= Uri.fromParts("package", packageName, null)
-            permIntent.data = permUri
-            startActivity(permIntent)
-        }
-
-        isFistLaunch= launchPref.getBoolean("isFirstLaunch", true)
         //
-        if (REQUIRED_PERMISSIONS.all {
-                ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-            })
-        {
-            turnOnBt()
-            bluetoothAdapter.cancelDiscovery()
-            registerReceiver(receiver, filter)
-            chatService= ChatService(this, bluetoothAdapter , this, this)
-        } else {
-            if (isFistLaunch) permAlertDialog.show() else permAlertDialog2.show()
-        }
-
-        requestedOrientation = if (compactScreen()) SCREEN_ORIENTATION_PORTRAIT else SCREEN_ORIENTATION_FULL_USER
-        //
+        registerReceiver(receiver, filter)
+        chatService= ChatService(this, bluetoothAdapter , this, this)
         setContent {
-            AppNavigation()
-        }
-    }
-
-    @Composable
-    private fun MainScreen(modifier: Modifier, navController: NavController, context: Context) {
-        val dynamicColor= dynamicColors(context)
-        val density= ScreenDensity(context)
-        val mainScope= rememberCoroutineScope()
-        val isDiscovering= remember { mutableStateOf(false) }
-        isDiscovering.value= if (REQUIRED_PERMISSIONS.all {
-                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-            }) {
-            bluetoothAdapter.isDiscovering
-        } else {
-            bluetoothAdapter.isDiscovering
-        }
-        //lottie anim
-        val lottieComposition by rememberLottieComposition(
-            LottieCompositionSpec.RawRes(
-                R.raw.discovering
-            )
-        )
-        //
-        val drawerState= rememberDrawerState(initialValue = DrawerValue.Closed, confirmStateChange = {true})
-        ModalNavigationDrawer(
-            scrimColor = Color.Transparent,
-            drawerState = drawerState,
-            drawerContent = {
-                ModalDrawerSheet(
-                    drawerContainerColor = dynamicColor.primaryContainer,
-                    modifier = modifier.fillMaxWidth(0.5f)
-                ){
-                    Column(
-                        modifier = modifier,
-                        verticalArrangement = Arrangement.Top,
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        //
-                        Spacer(modifier.height(density.vDp(5.0)))
-                        Text(text = stringResource(R.string.devicesAround),
-                            modifier= modifier.align(Alignment.CenterHorizontally),
-                            color = dynamicColor.onPrimaryContainer)
-                        Spacer(modifier.height(density.vDp(0.5)))
-                        HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
-                        Spacer(modifier.height(density.vDp(0.5)))
-                        if (REQUIRED_PERMISSIONS.all {
-                                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                            }) {
-                            if (discoveredDevices.isNotEmpty()) {
-                                discoveredDevices.forEach { device ->
-                                    NavigationDrawerItem(
-                                        label = { Text(
-                                            text = if (device?.name == null) device?.address.toString() else device?.name.toString(),
-                                            color = dynamicColor.onPrimaryContainer) },
-                                        icon = {
-                                            Icon(
-                                                ImageBitmap.imageResource(
-                                                    if (bluetoothAdapter.bondedDevices.contains(device)) R.drawable.bond_bonded
-                                                    else R.drawable.bond_none),
-                                                contentDescription = "search device",
-                                                modifier.size(density.vDp(2.0)),
-                                                tint = if (remoteDevice.value != null) {
-                                                    if (remoteDevice.value == device) Color.Green else dynamicColor.onPrimaryContainer
-                                                } else {
-                                                    dynamicColor.onPrimaryContainer
-                                                }
-                                            )
-                                        },
-                                        selected = false,
-                                        onClick =
-                                        {
-                                            selectedDevice= device
-                                            isPaired.value= bluetoothAdapter.bondedDevices.contains(device)
-                                            if (isPaired.value) {
-                                                navController.navigate("chat")
-                                                mainScope.launch {
-                                                    drawerState.close()
-                                                }
-                                            } else {
-                                                pairDevice(device!!)
-                                            }
-
-                                        }
-                                    )
-                                    HorizontalDivider(
-                                        modifier.widthIn(density.hDp(15.0), density.hDp(30.0)),
-                                        color = dynamicColor.onPrimaryContainer,
-                                        thickness = 1.dp)
-                                }
-                            }
-                        }
-                        //
-                    }
-                    Column(
-                        modifier = modifier
-                            .fillMaxHeight()
-                            .padding(start = density.hDp(2.6)),
-                        verticalArrangement = Arrangement.Bottom,
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        //
-                        Row(modifier, horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = stringResource(R.string.requestsAccepted),
-                                color = dynamicColor.onPrimaryContainer,
-                                modifier = modifier.padding(start = density.vDp(2.0)))
-                            SwitchButton(
-                                modifier = modifier,
-                                size = 0.8f,
-                                colors = SwitchColors(uncheckedIconColor = dynamicColor.onSecondaryContainer,
-                                    uncheckedThumbColor = dynamicColor.onSecondary,
-                                    uncheckedTrackColor = dynamicColor.secondary,
-                                    uncheckedBorderColor = Color.LightGray,
-                                    checkedIconColor = dynamicColor.onPrimaryContainer,
-                                    checkedThumbColor = dynamicColor.onPrimary,
-                                    checkedTrackColor = dynamicColor.primary,
-                                    checkedBorderColor = Color.Gray,
-                                    disabledCheckedIconColor = Color.White,
-                                    disabledCheckedThumbColor = Color.LightGray,
-                                    disabledCheckedTrackColor = Color.DarkGray,
-                                    disabledCheckedBorderColor = Color.Black,
-                                    disabledUncheckedIconColor = Color.White,
-                                    disabledUncheckedThumbColor = dynamicColor.inversePrimary,
-                                    disabledUncheckedTrackColor = Color.DarkGray,
-                                    disabledUncheckedBorderColor = Color.Magenta)
-                            )
-                        }
-                        Spacer(modifier.height(density.vDp(1.0)))
-                        HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
-                        NavigationDrawerItem(
-                            label = { Text(
-                                text = stringResource(R.string.Settings),
-                                color = dynamicColor.onPrimaryContainer) },
-                            icon = {
-                                Icon(
-                                    Icons.Filled.Settings,
-                                    contentDescription = "app settings",
-                                    modifier.size(density.vDp(2.0)),
-                                    tint = dynamicColor.onPrimaryContainer
-                                )
-                            },
-                            selected = false,
-                            onClick =
-                            {
-                                mainScope.launch {
-                                    drawerState.close()
-                                    navController.navigate("sets")
-                                }
-                            }
-                        )
-                        Spacer(modifier.height(density.vDp(3.2)))
-                    }
+            val permissionsState= rememberMultiplePermissionsState(permissions)
+            when (requestPermissions()) {
+                true -> {
+                    Screen()
+                    turnOnBt()
+                    bluetoothAdapter.cancelDiscovery()
                 }
-            },
-            gesturesEnabled = true
-        ) {
-            Scaffold(modifier = modifier.fillMaxSize(), containerColor = dynamicColor.background) { innerPadding ->
-                Column(modifier.fillMaxSize().padding(innerPadding), verticalArrangement = Arrangement.Top) {
-                    Spacer(modifier.height(density.vDp(8.0)))
-                    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Top) {
-                        if (REQUIRED_PERMISSIONS.all {
-                                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
-                            }) {
-                            Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Top) {
-                                val discoveringStateText= remember { mutableStateOf("") }
-                                discoveringStateText.value= if (isDiscovering.value) getString(R.string.searching) else getString(R.string.searching_stp)
-                                DiscoveryTextAnimation(discoveringStateText.value, modifier, dynamicColor.onBackground)
-                                Spacer(modifier.height(density.vDp(2.0)))
-                                //
-                                LottieAnimation(
-                                    composition = lottieComposition,
-                                    iterations = LottieConstants.IterateForever,
-                                    isPlaying = isDiscovering.value,
-                                    modifier = modifier.fillMaxSize(0.35f),
-                                    alignment = Alignment.Center,
-                                    contentScale = ContentScale.Crop
-                                )
-                                Spacer(modifier.height(density.vDp(2.0)))
-                                val filledSize: Dp by animateDpAsState(
-                                    targetValue = if (!isDiscovering.value) density.aDp(8.0) else density.aDp(4.0),
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMedium
-                                    )
-                                )
-                                FilledIconButton(
-                                    onClick = {
-                                        bluetoothAdapter.startDiscovery()
-                                        object : CountDownTimer(10000, 1) {
-                                            override fun onTick(millisUntilFinished: Long) {
-                                                if (REQUIRED_PERMISSIONS.all {
-                                                        ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
-                                                    }) {
-                                                    isDiscovering.value= bluetoothAdapter.isDiscovering
-                                                }
-                                            }
-                                            override fun onFinish() {
-                                                if (REQUIRED_PERMISSIONS.all {
-                                                        ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
-                                                    }) {
-                                                    bluetoothAdapter.cancelDiscovery()
-                                                }
-                                                isDiscovering.value= false
-                                            }
-                                        }.start()
-                                    },
-                                    modifier = modifier.size(filledSize),
-                                    shape = RoundedCornerShape(if (!isDiscovering.value) density.aDp(3.0) else density.aDp(1.5)),
-                                    enabled = !isDiscovering.value,
-                                    colors = IconButtonColors(
-                                        containerColor = dynamicColor.tertiaryContainer,
-                                        contentColor = dynamicColor.onTertiaryContainer,
-                                        disabledContainerColor = Color.Gray,
-                                        disabledContentColor = Color.LightGray)
-                                ){
-                                    Icon(
-                                        ImageBitmap.imageResource(R.drawable.search_ic),
-                                        contentDescription = "search device",
-                                        modifier.size(if (!isDiscovering.value) density.aDp(5.0) else density.aDp(2.5)),
-                                        tint = dynamicColor.onTertiaryContainer
-                                    )
-                                }
-                            }
+                else -> {
+                    LaunchedEffect(Unit) {
+                        if (!permissionsState.allPermissionsGranted) {
+                            permissionsState.launchMultiplePermissionRequest()
                         }
                     }
                 }
@@ -439,14 +183,11 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
         //
     }
 
+    @OptIn(ExperimentalPermissionsApi::class)
     @Composable
-    private fun ChatScreen(modifier: Modifier, navController: NavController, context: Context, service: ChatService) {
-        Chat(modifier, navController, context, service).Screen()
-    }
-
-    @Composable
-    private fun SettingsScreen(modifier: Modifier, navController: NavController, context: Context) {
-        AppSettings(modifier, navController, context, launchPref).Screen()
+    private fun requestPermissions(): Boolean {
+        val permissionsState= rememberMultiplePermissionsState(permissions)
+        return permissionsState.allPermissionsGranted
     }
 
     //navigation
@@ -528,7 +269,227 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
             composable("chat") { ChatScreen(modifier = Modifier, navController, this@MainActivity, chatService) }
             composable("sets") { SettingsScreen(modifier = Modifier, navController, this@MainActivity) }
         }
+    }
 
+    @Composable
+    fun Screen() {
+        AppNavigation()
+    }
+    
+    @SuppressLint("MissingPermission")
+    @Composable
+    private fun MainScreen(modifier: Modifier, navController: NavController, context: Context) {
+        val dynamicColor= dynamicColors(context)
+        val density= ScreenDensity(context)
+        val mainScope= rememberCoroutineScope()
+        val isDiscovering= remember { mutableStateOf(false) }
+        isDiscovering.value= bluetoothAdapter.isDiscovering
+        //lottie anim
+        val lottieComposition by rememberLottieComposition(
+            LottieCompositionSpec.RawRes(
+                R.raw.discovering
+            )
+        )
+        //
+        val drawerState= rememberDrawerState(initialValue = DrawerValue.Closed, confirmStateChange = {true})
+        ModalNavigationDrawer(
+            scrimColor = Color.Transparent,
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    drawerContainerColor = dynamicColor.primaryContainer,
+                    modifier = modifier.fillMaxWidth(0.5f)
+                ){
+                    Column(
+                        modifier = modifier,
+                        verticalArrangement = Arrangement.Top,
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        //
+                        Spacer(modifier.height(density.vDp(5.0)))
+                        Text(text = stringResource(R.string.devicesAround),
+                            modifier= modifier.align(Alignment.CenterHorizontally),
+                            color = dynamicColor.onPrimaryContainer)
+                        Spacer(modifier.height(density.vDp(0.5)))
+                        HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
+                        Spacer(modifier.height(density.vDp(0.5)))
+                        if (discoveredDevices.isNotEmpty()) {
+                            discoveredDevices.forEach { device ->
+                                NavigationDrawerItem(
+                                    label = { Text(
+                                        text = if (device?.name == null) device?.address.toString() else device?.name.toString(),
+                                        color = dynamicColor.onPrimaryContainer) },
+                                    icon = {
+                                        Icon(
+                                            ImageBitmap.imageResource(
+                                                if (bluetoothAdapter.bondedDevices.contains(device)) R.drawable.bond_bonded
+                                                else R.drawable.bond_none),
+                                            contentDescription = "search device",
+                                            modifier.size(density.vDp(2.0)),
+                                            tint = if (remoteDevice.value != null) {
+                                                if (remoteDevice.value == device) Color.Green else dynamicColor.onPrimaryContainer
+                                            } else {
+                                                dynamicColor.onPrimaryContainer
+                                            }
+                                        )
+                                    },
+                                    selected = false,
+                                    onClick =
+                                    {
+                                        selectedDevice= device
+                                        isPaired.value= bluetoothAdapter.bondedDevices.contains(device)
+                                        if (isPaired.value) {
+                                            navController.navigate("chat")
+                                            mainScope.launch {
+                                                drawerState.close()
+                                            }
+                                        } else {
+                                            pairDevice(device!!)
+                                        }
+
+                                    }
+                                )
+                                HorizontalDivider(
+                                    modifier.widthIn(density.hDp(15.0), density.hDp(30.0)),
+                                    color = dynamicColor.onPrimaryContainer,
+                                    thickness = 1.dp)
+                            }
+                        }
+                        //
+                    }
+                    Column(
+                        modifier = modifier
+                            .fillMaxHeight()
+                            .padding(start = density.hDp(2.6)),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        //
+                        Row(modifier, horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = stringResource(R.string.requestsAccepted),
+                                color = dynamicColor.onPrimaryContainer,
+                                modifier = modifier.padding(start = density.vDp(2.0)))
+                            SwitchButton(
+                                modifier = modifier,
+                                size = 0.8f,
+                                colors = SwitchColors(uncheckedIconColor = dynamicColor.onSecondaryContainer,
+                                    uncheckedThumbColor = dynamicColor.onSecondary,
+                                    uncheckedTrackColor = dynamicColor.secondary,
+                                    uncheckedBorderColor = Color.LightGray,
+                                    checkedIconColor = dynamicColor.onPrimaryContainer,
+                                    checkedThumbColor = dynamicColor.onPrimary,
+                                    checkedTrackColor = dynamicColor.primary,
+                                    checkedBorderColor = Color.Gray,
+                                    disabledCheckedIconColor = Color.White,
+                                    disabledCheckedThumbColor = Color.LightGray,
+                                    disabledCheckedTrackColor = Color.DarkGray,
+                                    disabledCheckedBorderColor = Color.Black,
+                                    disabledUncheckedIconColor = Color.White,
+                                    disabledUncheckedThumbColor = dynamicColor.inversePrimary,
+                                    disabledUncheckedTrackColor = Color.DarkGray,
+                                    disabledUncheckedBorderColor = Color.Magenta)
+                            )
+                        }
+                        Spacer(modifier.height(density.vDp(1.0)))
+                        HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
+                        NavigationDrawerItem(
+                            label = { Text(
+                                text = stringResource(R.string.Settings),
+                                color = dynamicColor.onPrimaryContainer) },
+                            icon = {
+                                Icon(
+                                    Icons.Filled.Settings,
+                                    contentDescription = "app settings",
+                                    modifier.size(density.vDp(2.0)),
+                                    tint = dynamicColor.onPrimaryContainer
+                                )
+                            },
+                            selected = false,
+                            onClick =
+                            {
+                                mainScope.launch {
+                                    drawerState.close()
+                                    navController.navigate("sets")
+                                }
+                            }
+                        )
+                        Spacer(modifier.height(density.vDp(3.2)))
+                    }
+                }
+            },
+            gesturesEnabled = true
+        ) {
+            Scaffold(modifier = modifier.fillMaxSize(), containerColor = dynamicColor.background) { innerPadding ->
+                Column(modifier.fillMaxSize().padding(innerPadding), verticalArrangement = Arrangement.Top) {
+                    Spacer(modifier.height(density.vDp(8.0)))
+                    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Top) {
+                        Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Top) {
+                            val discoveringStateText= remember { mutableStateOf("") }
+                            discoveringStateText.value= if (isDiscovering.value) getString(R.string.searching) else getString(R.string.searching_stp)
+                            DiscoveryTextAnimation(discoveringStateText.value, modifier, dynamicColor.onBackground)
+                            Spacer(modifier.height(density.vDp(2.0)))
+                            //
+                            LottieAnimation(
+                                composition = lottieComposition,
+                                iterations = LottieConstants.IterateForever,
+                                isPlaying = isDiscovering.value,
+                                modifier = modifier.fillMaxSize(0.35f),
+                                alignment = Alignment.Center,
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier.height(density.vDp(2.0)))
+                            val filledSize: Dp by animateDpAsState(
+                                targetValue = if (!isDiscovering.value) density.aDp(8.0) else density.aDp(4.0),
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )
+                            FilledIconButton (
+                                onClick = {
+                                    bluetoothAdapter.startDiscovery()
+                                    object : CountDownTimer(10000, 1) {
+                                        override fun onTick(millisUntilFinished: Long) {
+                                            isDiscovering.value= bluetoothAdapter.isDiscovering
+                                        }
+                                        override fun onFinish() {
+                                            bluetoothAdapter.cancelDiscovery()
+                                            isDiscovering.value= false
+                                        }
+                                    }.start()
+                                },
+                                modifier = modifier.size(filledSize),
+                                shape = RoundedCornerShape(if (!isDiscovering.value) density.aDp(3.0) else density.aDp(1.5)),
+                                enabled = !isDiscovering.value,
+                                colors = IconButtonColors(
+                                    containerColor = dynamicColor.tertiaryContainer,
+                                    contentColor = dynamicColor.onTertiaryContainer,
+                                    disabledContainerColor = Color.Gray,
+                                    disabledContentColor = Color.LightGray)
+                            ){
+                                Icon(
+                                    ImageBitmap.imageResource(R.drawable.search_ic),
+                                    contentDescription = "search device",
+                                    modifier.size(if (!isDiscovering.value) density.aDp(5.0) else density.aDp(2.5)),
+                                    tint = dynamicColor.onTertiaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        //
+    }
+
+    @Composable
+    private fun ChatScreen(modifier: Modifier, navController: NavController, context: Context, service: ChatService) {
+        Chat(modifier, navController, context, service).Screen()
+    }
+
+    @Composable
+    private fun SettingsScreen(modifier: Modifier, navController: NavController, context: Context) {
+        AppSettings(modifier, navController, context).Screen()
     }
 
     @Composable
@@ -551,7 +512,6 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
         colors: SwitchColors = SwitchDefaults.colors() )
     {
         val switchScope= rememberCoroutineScope()
-        val sepServer by remember { mutableStateOf(launchPref.getBoolean("sepServer", false)) }
         Switch(
             modifier = modifier.scale(size),
             checked = isChat.value,
@@ -569,7 +529,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                         }
                     }
                 }
-                if (isChat.value && !sepServer) {
+                if (isChat.value) {
                     setDiscoverable()
                 }
             },
@@ -598,15 +558,11 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
     }
 
     private fun setDiscoverable() {
-        if (REQUIRED_PERMISSIONS.all {
-                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
-            }) {
-            if (bluetoothAdapter.isEnabled) {
-                val discoverableIntent= Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
-                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, discoverableDuration.intValue)
-                }
-                discoverableLauncher.launch(discoverableIntent)
+        if (bluetoothAdapter.isEnabled) {
+            val discoverableIntent= Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, discoverableDuration.intValue)
             }
+            startActivityForResult(discoverableIntent, 1)
         }
     }
 
@@ -621,10 +577,11 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                 windowSizeClass.windowHeightSizeClass == WindowHeightSizeClass.COMPACT
     }
 
+    @SuppressLint("MissingPermission")
     private fun turnOnBt() {
         if (!bluetoothAdapter.isEnabled) {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-            enableBluetoothLauncher.launch(enableBtIntent)
+            startActivityForResult(enableBtIntent, 1)
         }
     }
 
@@ -640,6 +597,11 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
         }
         pairDialog.show()
     }
+
+    private fun allPermissionsGranted(): Boolean =
+        REQUIRED_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
 
     override fun onConnectionStateChanged(state: Boolean) {
         isConnected.value= state

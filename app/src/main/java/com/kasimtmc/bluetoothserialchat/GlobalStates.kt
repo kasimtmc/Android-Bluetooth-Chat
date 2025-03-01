@@ -12,7 +12,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.kasimtmc.bluetoothserialchat.ui.Chat
 
 object GlobalStates {
     private val remote: BluetoothDevice? = null
@@ -29,9 +28,6 @@ object GlobalStates {
     val hasRemote= mutableStateOf(false)
     val remoteDevice= mutableStateOf(remote)
     val serverName= mutableStateOf("Chat Server")
-    val settingSwitches= mutableStateListOf("Sunucu açıldığında bulunabilirlik açılmasın", "Arama süresi", "Bulunabilirlik süresi")
-    val settingSwitchesPref= mutableStateListOf("sepServer", "searchTime", "disTime")
-    val isButton= mutableStateListOf( true, false, false)
 
     @Composable
     fun dynamicColors(context: Context): ColorScheme {
