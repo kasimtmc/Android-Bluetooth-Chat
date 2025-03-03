@@ -15,7 +15,11 @@
     <string name="server_started">Sunucu başlatılıyor...</string>
     <string name="searching">Cihazlar aranıyor...</string>
     <string name="searching_stp">Arama duraklatıldı</string>
-    <string name="Settings">Ayarlar</string>
+    <string name="settings">Ayarlar</string>
     <string name="requestsAccepted">Sunucuyu aç</string>
     <string name="devicesAround">Çevredeki Cihazlar</string>
+    <string name="bt_on">Bluetooth açıldı!</string>
+    <string name="bt_on_req_cancelled">Bluetooth\'u açma isteği reddedildi!</string>
+    <string name="discoverable_req_cancelled">Keşfedilebilir olma isteği reddedildi!</string>
+    <string name="discoverable">Diğer cihazlar sizi bulabilir!</string>
 </resources>

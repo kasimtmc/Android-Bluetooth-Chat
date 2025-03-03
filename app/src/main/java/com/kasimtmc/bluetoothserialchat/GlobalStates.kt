@@ -8,7 +8,6 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,7 +17,6 @@ object GlobalStates {
     //message list, related with Message()
     val messages= mutableStateListOf<Message>()
     // connection state
-    val discoverableDuration= mutableIntStateOf( 300)
     val discoveredDevices= mutableStateListOf<BluetoothDevice?>()
     val isConnected= mutableStateOf(false)
     val isPaired= mutableStateOf(false)
@@ -28,6 +26,9 @@ object GlobalStates {
     val hasRemote= mutableStateOf(false)
     val remoteDevice= mutableStateOf(remote)
     val serverName= mutableStateOf("Chat Server")
+    val settingSwitches= mutableStateListOf("Arama süresi (sn)", "Bulunabilirlik süresi (sn)", "Sunucu açıldığında bulunabilirlik açılmasın", "İsimsiz cihazları göster")
+    val settingSwitchesPref= mutableStateListOf("searchTime", "discoTime", "sepServer", "nameless")
+    val isButton= mutableStateListOf(false, false, true, true)
 
     @Composable
     fun dynamicColors(context: Context): ColorScheme {
