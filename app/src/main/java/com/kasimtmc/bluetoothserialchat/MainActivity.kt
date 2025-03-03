@@ -483,7 +483,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                             FilledIconButton (
                                 onClick = {
                                     bluetoothAdapter.startDiscovery()
-                                    object : CountDownTimer(setsPref.getInt("searchTime", 10).toLong(), 1) {
+                                    object : CountDownTimer(setsPref.getInt("searchTime", 10).toLong()*1000, 1) {
                                         override fun onTick(millisUntilFinished: Long) {
                                             isDiscovering= if (REQUIRED_PERMISSIONS.all {
                                                     ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED

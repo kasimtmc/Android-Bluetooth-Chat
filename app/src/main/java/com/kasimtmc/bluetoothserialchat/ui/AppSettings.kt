@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -115,7 +117,7 @@ class AppSettings(
                             .fillMaxWidth()
                             .padding(
                                 start = density.hDp(6.0),
-                                end = if (isButton[settingSwitches.indexOf(item)]) density.hDp(6.0) else density.hDp(4.0),
+                                end = if (isButton[settingSwitches.indexOf(item)]) density.hDp(6.0) else density.hDp(3.0),
                                 top = if (isButton[settingSwitches.indexOf(item)]) density.vDp(2.0) else density.vDp(0.0),
                                 bottom = if (isButton[settingSwitches.indexOf(item)]) density.vDp(4.0) else density.vDp(2.0)),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -125,7 +127,7 @@ class AppSettings(
                             item,
                             modifier.align(Alignment.CenterVertically),
                             color = dynamicColor.onBackground,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Start
                         )
                         if (isButton[settingSwitches.indexOf(item)]) {
                             var setValues by remember { mutableStateOf(setsPref.getBoolean(settingSwitchesPref[settingSwitches.indexOf(item)],false) ) }
@@ -169,7 +171,7 @@ class AppSettings(
                                 },
                                 modifier = modifier
                                     .align(Alignment.CenterVertically)
-                                    .width(72.dp)
+                                    .width(90.dp)
                                     .scale(0.7f),
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number,

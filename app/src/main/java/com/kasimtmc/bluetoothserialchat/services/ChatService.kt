@@ -13,14 +13,9 @@ import com.kasimtmc.bluetoothserialchat.Constants.REQUIRED_PERMISSIONS
 import com.kasimtmc.bluetoothserialchat.Constants.SERVICE_UUID
 import com.kasimtmc.bluetoothserialchat.GlobalStates.deviceDetails
 import com.kasimtmc.bluetoothserialchat.GlobalStates.isChat
-import com.kasimtmc.bluetoothserialchat.GlobalStates.isConnected
-import com.kasimtmc.bluetoothserialchat.GlobalStates.isPaired
 import com.kasimtmc.bluetoothserialchat.GlobalStates.remoteDevice
 import com.kasimtmc.bluetoothserialchat.GlobalStates.selectedDevice
 import com.kasimtmc.bluetoothserialchat.GlobalStates.serverName
-import com.kasimtmc.bluetoothserialchat.MainActivity
-import com.kasimtmc.bluetoothserialchat.R
-import com.kasimtmc.bluetoothserialchat.ui.Chat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -43,12 +38,10 @@ class ChatService(
     private lateinit var outputStream: OutputStream
     private lateinit var connectedThread: ConnectedThread
 
-    private fun allPermissionsGranted()= REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-    }
-
     suspend fun startServer() {
-        if (allPermissionsGranted()) {
+        if (REQUIRED_PERMISSIONS.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }) {
             try {
                 withContext(Dispatchers.IO) {
                     serverSocket = adapter.listenUsingRfcommWithServiceRecord(serverName.value, uuid)
@@ -82,11 +75,13 @@ class ChatService(
     }
 
     suspend fun connect() {
-        if (allPermissionsGranted())
+        if (REQUIRED_PERMISSIONS.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            })
         {
-            withTimeout(2000) {
+            withTimeout(timeMillis= 3000) {
                 try {
-                    bluetoothSocket = if (isChat.value) {
+                    bluetoothSocket= if (isChat.value) {
                         socketSecure
                     } else {
                         selectedDevice!!.createRfcommSocketToServiceRecord(uuid)
@@ -98,7 +93,7 @@ class ChatService(
                         // nothing to do
                     }
                 } catch (e: IOException) {
-                    Toast.makeText(context, "Bağlanamadı", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Bağlanılamadı", Toast.LENGTH_SHORT).show()
                     Log.e("Bluetooth Service", "Bağlanılamadı", e)
                     bluetoothSocket?.close()
                 }
@@ -115,7 +110,7 @@ class ChatService(
     }
 
     suspend fun disconnect() {
-        withTimeout(2000) {
+        withTimeout(timeMillis = 2000) {
             try {
                 inputStream.close()
                 outputStream.close()
@@ -151,7 +146,7 @@ class ChatService(
             while (socket.isConnected) {
                 val buffer= ByteArray(1024)
                 var bytes: Int?
-                var message= ""
+                var message: String
                 try {
                     bytes= inStream.read(buffer)
                     message= String(buffer, 0, bytes)
@@ -165,7 +160,7 @@ class ChatService(
         fun write(outgoing: String) {
             try {
                 if (outgoing.isNotEmpty()) {
-                    //socket.outputStream.write(outgoing.toByteArray())
+                    //socket.outputStream.write(outgoing.toByteArray()) //
                     outStream.write(outgoing.toByteArray())
                     messageListener.onMessageSent(outgoing)
                 }
