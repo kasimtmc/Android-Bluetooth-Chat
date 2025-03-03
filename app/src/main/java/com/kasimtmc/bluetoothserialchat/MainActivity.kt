@@ -369,9 +369,9 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                                         selectedDevice= device
                                         isPaired.value= bluetoothAdapter.bondedDevices.contains(device)
                                         if (isPaired.value) {
-                                            navController.navigate("chat")
                                             mainScope.launch {
                                                 drawerState.close()
+                                                navController.navigate("chat")
                                             }
                                         } else {
                                             pairDevice(device!!)
