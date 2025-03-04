@@ -13,18 +13,21 @@ android {
         minSdk = 31
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "v1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        applicationIdSuffix = "rls"
+        versionNameSuffix = "-1a"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            multiDexEnabled = false
+            versionNameSuffix = "rls"
         }
     }
     compileOptions {

@@ -4,7 +4,7 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "com.kasimtmc.bluetoothserialchat",
+  "applicationId": "com.kasimtmc.bluetoothserialchat.rls",
   "variantName": "release",
   "elements": [
     {
@@ -12,7 +12,7 @@
       "filters": [],
       "attributes": [],
       "versionCode": 1,
-      "versionName": "1.0",
+      "versionName": "v1.1-1arls",
       "outputFile": "app-release.apk"
     }
   ],

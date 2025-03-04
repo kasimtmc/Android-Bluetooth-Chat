@@ -324,18 +324,16 @@ class MainActivity :
             )
         )
         var permissionsState by remember { mutableStateOf(false) }
-        if (isFistLaunch) {
-            object : CountDownTimer(60000, 1) {
-                override fun onTick(millisUntilFinished: Long) {
-                    if (REQUIRED_PERMISSIONS.all {
+        object : CountDownTimer(60000, 1) {
+            override fun onTick(millisUntilFinished: Long) {
+                if (REQUIRED_PERMISSIONS.all {
                         ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED }) onFinish()
-                }
-                override fun onFinish() {
-                    permissionsState= REQUIRED_PERMISSIONS.all {
-                        ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED }
-                }
-            }.start()
-        }
+            }
+            override fun onFinish() {
+                permissionsState= REQUIRED_PERMISSIONS.all {
+                    ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED }
+            }
+        }.start()
         //
         val drawerState= rememberDrawerState(initialValue = DrawerValue.Closed, confirmStateChange = {true})
         ModalNavigationDrawer(
