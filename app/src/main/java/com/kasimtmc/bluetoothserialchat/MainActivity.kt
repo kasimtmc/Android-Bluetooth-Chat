@@ -117,7 +117,12 @@ import kotlinx.coroutines.launch
 import java.text.BreakIterator
 import java.text.StringCharacterIterator
 
-class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatService.MessageListener {
+class MainActivity :
+    ComponentActivity(),
+    ChatService.ServiceListener,
+    ChatService.MessageListener
+{
+
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var chatService: ChatService
@@ -151,14 +156,13 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestedOrientation = if (compactScreen()) SCREEN_ORIENTATION_PORTRAIT else SCREEN_ORIENTATION_FULL_USER
+        requestedOrientation = if (ScreenDensity(this).compactScreen()) SCREEN_ORIENTATION_PORTRAIT else SCREEN_ORIENTATION_FULL_USER
         //
         bluetoothManager= getSystemService(BluetoothManager::class.java)
         bluetoothAdapter= bluetoothManager.adapter
         //
         isFirstLaunchPref= this.getSharedPreferences("launchState", MODE_PRIVATE)
         setsPref= this.getSharedPreferences("settingsState", MODE_PRIVATE)
-
         permAlertDialog= AlertDialog.Builder(this)
         permAlertDialog.setTitle(getString(R.string.perm_title))
         permAlertDialog.setMessage(getString(R.string.perm_text))
@@ -306,8 +310,8 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
 
     @Composable
     private fun MainScreen(modifier: Modifier, navController: NavController, context: Context) {
-        val dynamicColor= dynamicColors(context)
         val density= ScreenDensity(context)
+        val dynamicColor= dynamicColors(context)
         val mainScope= rememberCoroutineScope()
         var isDiscovering by remember { mutableStateOf(if (REQUIRED_PERMISSIONS.all {
                 ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
@@ -470,7 +474,7 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
                                 alignment = Alignment.Center,
                                 contentScale = ContentScale.Crop
                             )
-                            Spacer(modifier.height(density.vDp(2.0)))
+                            Spacer(modifier.height(if (density.compactScreen()) density.vDp(5.0) else density.hDp(12.0)))
                             val filledSize: Dp by animateDpAsState(
                                 targetValue = if (!isDiscovering) density.aDp(8.0) else density.aDp(4.0),
                                 animationSpec = spring(
@@ -603,17 +607,6 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
         }
     }
 
-    private fun compactScreen() : Boolean {
-        val metrics = WindowMetricsCalculator.getOrCreate().computeMaximumWindowMetrics(this)
-        val width = metrics.bounds.width()
-        val height = metrics.bounds.height()
-        val density = resources.displayMetrics.density
-        val windowSizeClass = WindowSizeClass.compute(width/density, height/density)
-
-        return windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT ||
-                windowSizeClass.windowHeightSizeClass == WindowHeightSizeClass.COMPACT
-    }
-
     private fun turnOnBt() {
         if (!bluetoothAdapter.isEnabled) {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -637,6 +630,20 @@ class MainActivity : ComponentActivity(), ChatService.ServiceListener, ChatServi
     @OptIn(ExperimentalPermissionsApi::class)
     @Composable
     private fun allPermissionsGranted(): Boolean = rememberMultiplePermissionsState(listOfPerms).allPermissionsGranted
+
+    fun permissionsGranted(): Boolean {
+        val permissionsState = REQUIRED_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+        return permissionsState
+    }
+
+    fun permissionsDenied(): Boolean {
+        val permissionsState = REQUIRED_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_DENIED
+        }
+        return permissionsState
+    }
 
     override fun onConnectionStateChanged(state: Boolean) {
         isConnected.value= state
