@@ -24,6 +24,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -314,14 +316,26 @@ class MainActivity :
         val dynamicColor= dynamicColors(context)
         val mainScope= rememberCoroutineScope()
         var isDiscovering by remember { mutableStateOf(if (REQUIRED_PERMISSIONS.all {
-                ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-            }) bluetoothAdapter.isDiscovering else false) }
+                ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }) bluetoothAdapter.isDiscovering else false) }
         //lottie anim
         val lottieComposition by rememberLottieComposition(
             LottieCompositionSpec.RawRes(
                 R.raw.discovering
             )
         )
+        var permissionsState by remember { mutableStateOf(false) }
+        if (isFistLaunch) {
+            object : CountDownTimer(60000, 1) {
+                override fun onTick(millisUntilFinished: Long) {
+                    if (REQUIRED_PERMISSIONS.all {
+                        ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED }) onFinish()
+                }
+                override fun onFinish() {
+                    permissionsState= REQUIRED_PERMISSIONS.all {
+                        ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED }
+                }
+            }.start()
+        }
         //
         val drawerState= rememberDrawerState(initialValue = DrawerValue.Closed, confirmStateChange = {true})
         ModalNavigationDrawer(
@@ -346,8 +360,8 @@ class MainActivity :
                         HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
                         Spacer(modifier.height(density.vDp(0.5)))
                         if (discoveredDevices.isNotEmpty() && REQUIRED_PERMISSIONS.all {
-                                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
-                            } ) {
+                                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED } )
+                        {
                             discoveredDevices.forEach { device ->
                                 NavigationDrawerItem(
                                     label = { Text(
@@ -406,7 +420,7 @@ class MainActivity :
                             SwitchButton(
                                 modifier = modifier,
                                 size = 0.8f,
-                                enabled = allPermissionsGranted(),
+                                enabled = permissionsState,
                                 colors = SwitchColors(uncheckedIconColor = dynamicColor.onSecondaryContainer,
                                     uncheckedThumbColor = dynamicColor.onSecondary,
                                     uncheckedTrackColor = dynamicColor.secondary,
@@ -488,20 +502,20 @@ class MainActivity :
                                     object : CountDownTimer(setsPref.getInt("searchTime", 10).toLong()*1000, 1) {
                                         override fun onTick(millisUntilFinished: Long) {
                                             isDiscovering= if (REQUIRED_PERMISSIONS.all {
-                                                    ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
-                                                }) bluetoothAdapter.isDiscovering else false
+                                                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
+                                            }) bluetoothAdapter.isDiscovering else false
                                         }
                                         override fun onFinish() {
                                             if (REQUIRED_PERMISSIONS.all {
-                                                    ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
-                                                }) bluetoothAdapter.cancelDiscovery()
+                                                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED
+                                            }) bluetoothAdapter.cancelDiscovery()
                                             isDiscovering= false
                                         }
                                     }.start()
                                 },
                                 modifier = modifier.size(filledSize),
                                 shape = RoundedCornerShape(if (!isDiscovering) density.aDp(3.0) else density.aDp(1.5)),
-                                enabled = (allPermissionsGranted() && !isDiscovering),
+                                enabled = (permissionsState && !isDiscovering),
                                 colors = IconButtonColors(
                                     containerColor = dynamicColor.tertiaryContainer,
                                     contentColor = dynamicColor.onTertiaryContainer,
@@ -541,7 +555,7 @@ class MainActivity :
             WindowCompat.setDecorFitsSystemWindows(window, false)
             val controller = WindowInsetsControllerCompat(window, view)
             controller.hide(WindowInsetsCompat.Type.systemBars()) // tuşlar ve statusbar'ı gizle
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE // alttan ya da üstten çekince göster
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE // göster
         }
     }
 
@@ -625,24 +639,6 @@ class MainActivity :
             Toast.makeText(this, getString(R.string.pairing_cancelled), Toast.LENGTH_SHORT).show()
         }
         pairDialog.show()
-    }
-
-    @OptIn(ExperimentalPermissionsApi::class)
-    @Composable
-    private fun allPermissionsGranted(): Boolean = rememberMultiplePermissionsState(listOfPerms).allPermissionsGranted
-
-    fun permissionsGranted(): Boolean {
-        val permissionsState = REQUIRED_PERMISSIONS.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
-        return permissionsState
-    }
-
-    fun permissionsDenied(): Boolean {
-        val permissionsState = REQUIRED_PERMISSIONS.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_DENIED
-        }
-        return permissionsState
     }
 
     override fun onConnectionStateChanged(state: Boolean) {
