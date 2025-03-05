@@ -24,8 +24,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -89,10 +87,6 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.window.core.layout.WindowHeightSizeClass
-import androidx.window.core.layout.WindowSizeClass
-import androidx.window.core.layout.WindowWidthSizeClass
-import androidx.window.layout.WindowMetricsCalculator
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
@@ -158,7 +152,7 @@ class MainActivity :
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestedOrientation = if (ScreenDensity(this).compactScreen()) SCREEN_ORIENTATION_PORTRAIT else SCREEN_ORIENTATION_FULL_USER
+        requestedOrientation = if (ScreenDensity(this).compactScreen().value) SCREEN_ORIENTATION_PORTRAIT else SCREEN_ORIENTATION_FULL_USER
         //
         bluetoothManager= getSystemService(BluetoothManager::class.java)
         bluetoothAdapter= bluetoothManager.adapter
@@ -310,6 +304,7 @@ class MainActivity :
         }
     }
 
+    @OptIn(ExperimentalPermissionsApi::class)
     @Composable
     private fun MainScreen(modifier: Modifier, navController: NavController, context: Context) {
         val density= ScreenDensity(context)
@@ -323,17 +318,7 @@ class MainActivity :
                 R.raw.discovering
             )
         )
-        var permissionsState by remember { mutableStateOf(false) }
-        object : CountDownTimer(60000, 1) {
-            override fun onTick(millisUntilFinished: Long) {
-                if (REQUIRED_PERMISSIONS.all {
-                        ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED }) onFinish()
-            }
-            override fun onFinish() {
-                permissionsState= REQUIRED_PERMISSIONS.all {
-                    ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED }
-            }
-        }.start()
+        val permissionsState= rememberMultiplePermissionsState(listOfPerms)
         //
         val drawerState= rememberDrawerState(initialValue = DrawerValue.Closed, confirmStateChange = {true})
         ModalNavigationDrawer(
@@ -418,7 +403,7 @@ class MainActivity :
                             SwitchButton(
                                 modifier = modifier,
                                 size = 0.8f,
-                                enabled = permissionsState,
+                                enabled = permissionsState.allPermissionsGranted,
                                 colors = SwitchColors(uncheckedIconColor = dynamicColor.onSecondaryContainer,
                                     uncheckedThumbColor = dynamicColor.onSecondary,
                                     uncheckedTrackColor = dynamicColor.secondary,
@@ -486,7 +471,7 @@ class MainActivity :
                                 alignment = Alignment.Center,
                                 contentScale = ContentScale.Crop
                             )
-                            Spacer(modifier.height(if (density.compactScreen()) density.vDp(5.0) else density.hDp(12.0)))
+                            Spacer(modifier.height(if (density.compactScreen().value) density.vDp(5.0) else density.hDp(12.0)))
                             val filledSize: Dp by animateDpAsState(
                                 targetValue = if (!isDiscovering) density.aDp(8.0) else density.aDp(4.0),
                                 animationSpec = spring(
@@ -513,7 +498,7 @@ class MainActivity :
                                 },
                                 modifier = modifier.size(filledSize),
                                 shape = RoundedCornerShape(if (!isDiscovering) density.aDp(3.0) else density.aDp(1.5)),
-                                enabled = (permissionsState && !isDiscovering),
+                                enabled = (permissionsState.allPermissionsGranted && !isDiscovering),
                                 colors = IconButtonColors(
                                     containerColor = dynamicColor.tertiaryContainer,
                                     contentColor = dynamicColor.onTertiaryContainer,
@@ -654,8 +639,7 @@ class MainActivity :
             hasRemote.value= false
         }
         if (device != null && discoveredDevices.contains(device)){
-            val deviceIndex= discoveredDevices.indexOf(device)
-            discoveredDevices.removeAt(deviceIndex)
+            discoveredDevices.removeAt(discoveredDevices.indexOf(device))
             discoveredDevices.add(device)
         }
     }

@@ -16,8 +16,7 @@ android {
         versionName = "v1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        applicationIdSuffix = "rls"
-        versionNameSuffix = "-1a"
+        versionNameSuffix = "-rls"
     }
 
     buildTypes {
@@ -26,8 +25,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            multiDexEnabled = false
-            versionNameSuffix = "rls"
         }
     }
     compileOptions {
