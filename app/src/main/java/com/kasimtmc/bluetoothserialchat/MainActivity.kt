@@ -9,9 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.ActivityInfo
 import android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER
 import android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -327,7 +329,11 @@ class MainActivity :
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = dynamicColor.primaryContainer.copy(alpha = 0.9f),
-                    modifier = modifier.fillMaxWidth(0.50f)
+                    modifier = modifier.fillMaxWidth(if (density.compactScreen().value) {
+                        0.5f
+                    } else {
+                        if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) 0.40f else 0.25f
+                    })
                 ){
                     Column(
                         modifier = modifier,
