@@ -44,6 +44,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -335,23 +337,32 @@ class MainActivity :
                         if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) 0.40f else 0.25f
                     })
                 ){
-                    Column(
-                        modifier = modifier,
+                    LazyColumn(
+                        modifier = modifier.fillMaxHeight(0.82f),
                         verticalArrangement = Arrangement.Top,
                         horizontalAlignment = Alignment.Start
                     ) {
                         //
-                        Spacer(modifier.height(density.vDp(5.0)))
-                        Text(text = stringResource(R.string.devicesAround),
-                            modifier= modifier.align(Alignment.CenterHorizontally),
-                            color = dynamicColor.onPrimaryContainer)
-                        Spacer(modifier.height(density.vDp(0.5)))
-                        HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
-                        Spacer(modifier.height(density.vDp(0.5)))
-                        if (discoveredDevices.isNotEmpty() && REQUIRED_PERMISSIONS.all {
-                                ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED } )
-                        {
-                            discoveredDevices.forEach { device ->
+                        item {
+                            Column(
+                                modifier = modifier,
+                                verticalArrangement = Arrangement.Top,
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                Spacer(modifier.height(density.vDp(5.0)))
+                                Text(text = stringResource(R.string.devicesAround),
+                                    modifier= modifier.align(Alignment.CenterHorizontally),
+                                    color = dynamicColor.onPrimaryContainer)
+                                Spacer(modifier.height(density.vDp(0.5)))
+                                HorizontalDivider(color = dynamicColor.onPrimaryContainer, thickness = 2.dp)
+                                Spacer(modifier.height(density.vDp(0.5)))
+                            }
+                        }
+                        items(discoveredDevices) { device ->
+                            //
+                            if (discoveredDevices.isNotEmpty() && REQUIRED_PERMISSIONS.all {
+                                    ContextCompat.checkSelfPermission(this@MainActivity, it) == PackageManager.PERMISSION_GRANTED } )
+                            {
                                 NavigationDrawerItem(
                                     label = { Text(
                                         text = if (device?.name == null) device?.address.toString() else device?.name.toString(),
@@ -372,24 +383,25 @@ class MainActivity :
                                     },
                                     selected = false,
                                     onClick =
-                                    {
-                                        selectedDevice= device
-                                        isPaired.value= bluetoothAdapter.bondedDevices.contains(device)
-                                        if (isPaired.value) {
-                                            mainScope.launch {
-                                                drawerState.close()
-                                                navController.navigate("chat")
+                                        {
+                                            selectedDevice= device
+                                            isPaired.value= bluetoothAdapter.bondedDevices.contains(device)
+                                            if (isPaired.value) {
+                                                mainScope.launch {
+                                                    drawerState.close()
+                                                    navController.navigate("chat")
+                                                }
+                                            } else {
+                                                pairDevice(device!!)
                                             }
-                                        } else {
-                                            pairDevice(device!!)
-                                        }
 
-                                    }
+                                        }
                                 )
                                 HorizontalDivider(
                                     modifier.widthIn(density.hDp(15.0), density.hDp(30.0)),
                                     color = dynamicColor.onPrimaryContainer,
-                                    thickness = 1.dp)
+                                    thickness = 1.dp
+                                )
                             }
                         }
                         //
